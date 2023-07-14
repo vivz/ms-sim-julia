@@ -10,7 +10,7 @@ function get_closure(config::ChainConfiguration, ion_pair::Tuple{Int64,Int64}, �
     for j in ion_pair
         for k in 1:length(config.ω_k)
             scale = config.Ω_j[j] * config.η_k[k] * config.β_jk[j][k]
-            integral = im / (config.ω_k[k] - μ) * (exp(-im * t * config.ω_k[k] - μ) - 1)
+            integral = im / (config.ω_k[k] - μ) * (exp(-im * t * (config.ω_k[k] - μ)) - 1)
             closure = closure + scale * integral
         end
     end
@@ -37,4 +37,4 @@ chain = ChainConfiguration(
 )
 
 freq = (2.08321498e6 + 2.176e6)/2
-get_closure(chain, (1,2), freq, 1.0)
+get_closure(chain, (1,2), freq, 130e-6)
