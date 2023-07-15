@@ -1,10 +1,11 @@
 using Optim
 using Plots
+using LineSearches
 
 const EURIQA_x0 = 2.7408e-6
 const EURIQA_v0 = 525.39e-6
 const ELECTRON_CHARGE = 1.60217663e-19
-const PERMITTIVITY= 8.8541878128e-12
+const PERMITTIVITY = 8.8541878128e-12
 
 struct TrapVoltage
     x1::Float64
@@ -50,41 +51,63 @@ function calculate_gradient!(G, trap::TrapVoltage, ion_positions::Vector{Float64
     # Calculate total potential's analytical gradient wrt each ion position 
     for i in eachindex(G)
         x = ion_positions[i] / EURIQA_x0
-        trap_gradient = EURIQA_v0 / EURIQA_x0 * (trap.x1 + trap.x2 * x + trap.x3 * x^2 / 2.0 + trap.x4 * x^3 / 6.0) 
+        trap_gradient = EURIQA_v0 / EURIQA_x0 * (trap.x1 + trap.x2 * x + trap.x3 * x^2 / 2.0 + trap.x4 * x^3 / 6.0)
         coulomb_gradient = 0.0
         for j in eachindex(ion_positions)
             if j != i
                 distance = ion_positions[j] - ion_positions[i]
                 coulomb_gradient = coulomb_gradient + sign(distance) / distance^2
-            end 
-        end 
+            end
+        end
         G[i] = trap_gradient + ELECTRON_CHARGE / (4π * PERMITTIVITY) * coulomb_gradient
-    end 
-end 
+    end
+end
 
 function get_ion_spacing_for_voltage(trap::TrapVoltage)
     # Find ion positions with minimum energy for a given voltage 
     num_ion = trap.num_ion
     initial_ion_spacing = collect(LinRange(-num_ion / 2, num_ion / 2, num_ion)) * 1e-6
     res = optimize(
-            params -> get_total_potential(trap, params), 
-            (G, params) -> calculate_gradient!(G, trap, params), 
-            initial_ion_spacing,
-            Optim.Options(iterations = 50000)
-        )
-    print(res)
+        params -> get_total_potential(trap, params),
+        (G, params) -> calculate_gradient!(G, trap, params),
+        initial_ion_spacing,
+        Optim.Options(iterations=50000)
+    )
     return Optim.minimizer(res)
 end
 
-function get_deviation(ion_positions::Vector{Float64}, spacing::Float64, num_edge_ion::Int64)
-    # Calculates deviation from ideal equalspaced configuration
+function get_deviation(ion_positions::Vector{Float64}, spacing::Float64, num_edge_ion::Int64=0)
+    # Calculates deviation from the ideal equal-spaced configuration
     num_ion = length(ion_positions) - num_edge_ion * 2
-    ideal_positions = collect(LinRange(-num_ion * spacing/4, num_ion * spacing/4, num_ion))
-    print(ideal_positions)
-    return sum((ion_positions[num_edge_ion+1:end-num_edge_ion] - ideal_positions).^2)
+    ideal_positions = collect(LinRange(-num_ion * spacing / 4, num_ion * spacing / 4, num_ion))
+    return sum((ion_positions[num_edge_ion+1:end-num_edge_ion] - ideal_positions) .^ 2) * 1e10
+end
+
+function get_voltage(spacing::Float64, num_ion::Int64, quadratic::Bool=true, num_edge_ion::Int64=0)
+    initial_params = quadratic ? [0.1] : [0.2, 0.001] # only using x2 and x4 for optimization
+    lower = quadratic ? [0] : [0, 0]
+    upper = quadratic ? [Inf] : [Inf, Inf]
+    inner_optimizer = GradientDescent(linesearch=LineSearches.BackTracking(order=3))
+    res = Optim.optimize(
+        params -> get_deviation(
+            get_ion_spacing_for_voltage(TrapVoltage(0.0, params[1], 0.0, quadratic ? 0.0 : params[2], num_ion)), spacing, num_edge_ion),
+        lower,
+        upper,
+        initial_params,
+        Fminbox(inner_optimizer)
+    )
+    # calculate best voltage for a given ion initial_ion_spacing
+    print(res)
+    voltages = Optim.minimizer(res)
+    return TrapVoltage(0.0, voltages[1], 0.0, quadratic ? 0.0 : voltages[2], num_ion)
 end 
 
-trap = TrapVoltage(0, 0.4, 0, 0.0, 2)
-spacing = get_ion_spacing_for_voltage(trap)
-scatter(spacing, zeros(trap.num_ion), label="data", minorgrid=true)
-print(spacing)
+# trap = TrapVoltage(0, 0.4, 0, 0.0, 2)
+ideal_voltage = get_voltage(4.7e-6, 2, true, 0)
+print(ideal_voltage)
+pos = get_ion_spacing_for_voltage(ideal_voltage)
+scatter(pos, zeros(trap.num_ion), minorgrid=true)
+ylims!(-1,1)
+
+
+
