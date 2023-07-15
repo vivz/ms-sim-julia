@@ -84,6 +84,7 @@ function get_deviation(ion_positions::Vector{Float64}, spacing::Float64, num_edg
 end
 
 function get_voltage(spacing::Float64, num_ion::Int64, quadratic::Bool=true, num_edge_ion::Int64=0)
+    # For an ideal spacing, calculate voltage solutions that gives the closest configuration
     initial_params = quadratic ? [0.1] : [0.2, 0.001] # only using x2 and x4 for optimization
     lower = quadratic ? [0] : [0, 0]
     upper = quadratic ? [Inf] : [Inf, Inf]
@@ -103,7 +104,7 @@ function get_voltage(spacing::Float64, num_ion::Int64, quadratic::Bool=true, num
 end 
 
 # trap = TrapVoltage(0, 0.4, 0, 0.0, 2)
-ideal_voltage = get_voltage(4.7e-6, 2, true, 0)
+ideal_voltage = get_voltage(4.7e-6, 31, true, 0)
 print(ideal_voltage)
 pos = get_ion_spacing_for_voltage(ideal_voltage)
 scatter(pos, zeros(trap.num_ion), minorgrid=true)
