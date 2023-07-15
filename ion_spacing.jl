@@ -17,6 +17,7 @@ end
 # Calculates ion poosition given a voltage configuration
 
 function get_voltage(trap::TrapVoltage, x::Float64)
+    # Calculate voltage in the trap electrode
     x′ = x / EURIQA_x0
     return EURIQA_v0 * (trap.x1 * x′ + trap.x2 * x′^2 / 2.0 + trap.x3 * x′^3 / 6.0 + trap.x4 * x′^4 / 24.0)
 end
@@ -34,6 +35,7 @@ function get_coulomb_potential_at_x(ion_positions::Vector{Float64}, ion_index::I
 end
 
 function get_total_potential(trap::TrapVoltage, ion_positions::Vector{Float64})
+    # For a given voltage configuration and ion positions, calculate total potential
     total_potential = 0.0
     for i in eachindex(ion_positions)
         trap_potential = get_voltage(trap, ion_positions[i])
@@ -45,7 +47,7 @@ function get_total_potential(trap::TrapVoltage, ion_positions::Vector{Float64})
 end
 
 function calculate_gradient!(G, trap::TrapVoltage, ion_positions::Vector{Float64})
-    # Calculate total potential's gradient wrt each ion position 
+    # Calculate total potential's analytical gradient wrt each ion position 
     for i in eachindex(G)
         x = ion_positions[i] / EURIQA_x0
         trap_gradient = EURIQA_v0 / EURIQA_x0 * (trap.x1 + trap.x2 * x + trap.x3 * x^2 / 2.0 + trap.x4 * x^3 / 6.0) 
@@ -61,7 +63,7 @@ function calculate_gradient!(G, trap::TrapVoltage, ion_positions::Vector{Float64
 end 
 
 function get_ion_spacing_for_voltage(trap::TrapVoltage)
-    # returns in um
+    # Find ion positions with minimum energy for a given voltage 
     num_ion = trap.num_ion
     initial_ion_spacing = collect(LinRange(-num_ion / 2, num_ion / 2, num_ion)) * 1e-6
     res = optimize(
@@ -74,16 +76,15 @@ function get_ion_spacing_for_voltage(trap::TrapVoltage)
     return Optim.minimizer(res)
 end
 
-function get_deviation(ion_positions::Vector{Float64})
-    num_ion = length(ion_positions)
-    ion_spacings = Array{Float64}(undef, num_ion) 
-    for i in 2:num_ion
-        ion_spacings[i] = ion_positions[i] - ion_positions[i-1]
-    end
-    return std(ion_spacings)
+function get_deviation(ion_positions::Vector{Float64}, spacing::Float64, num_edge_ion::Int64)
+    # Calculates deviation from ideal equalspaced configuration
+    num_ion = length(ion_positions) - num_edge_ion * 2
+    ideal_positions = collect(LinRange(-num_ion * spacing/4, num_ion * spacing/4, num_ion))
+    print(ideal_positions)
+    return sum((ion_positions[num_edge_ion+1:end-num_edge_ion] - ideal_positions).^2)
 end 
 
-trap = TrapVoltage(0, 0.398, 0, 0.02, 31)
+trap = TrapVoltage(0, 0.4, 0, 0.0, 2)
 spacing = get_ion_spacing_for_voltage(trap)
 scatter(spacing, zeros(trap.num_ion), label="data", minorgrid=true)
 print(spacing)
