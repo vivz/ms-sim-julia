@@ -6,6 +6,8 @@ const EURIQA_x0 = 2.7408e-6
 const EURIQA_v0 = 525.39e-6
 const ELECTRON_CHARGE = 1.60217663e-19
 const PERMITTIVITY = 8.8541878128e-12
+const YB171_MASS = 1.6605390e-27 * 171.0 
+
 
 struct TrapVoltage
     x1::Float64
@@ -83,7 +85,7 @@ function get_deviation(ion_positions::Vector{Float64}, spacing::Float64, num_edg
     return sum((ion_positions[num_edge_ion+1:end-num_edge_ion] - ideal_positions) .^ 2) * 1e10
 end
 
-function get_voltage(spacing::Float64, num_ion::Int64, quadratic::Bool=true, num_edge_ion::Int64=0)
+function find_voltage_for_spacing(spacing::Float64, num_ion::Int64, quadratic::Bool=true, num_edge_ion::Int64=0)
     # For an ideal spacing, calculate voltage solutions that gives the closest configuration
     initial_params = quadratic ? [0.1] : [0.2, 0.001] # only using x2 and x4 for optimization
     lower = quadratic ? [0] : [0, 0]
@@ -103,11 +105,12 @@ function get_voltage(spacing::Float64, num_ion::Int64, quadratic::Bool=true, num
     return TrapVoltage(0.0, voltages[1], 0.0, quadratic ? 0.0 : voltages[2], num_ion)
 end 
 
-# trap = TrapVoltage(0, 0.4, 0, 0.0, 2)
-ideal_voltage = get_voltage(4.7e-6, 31, true, 0)
+num_ions = 31
+# trap = TrapVoltage(0, 0.4, 0, 0.0, num_ions)
+ideal_voltage = find_voltage_for_spacing(4.7e-6, num_ions, true, 0)
 print(ideal_voltage)
 pos = get_ion_spacing_for_voltage(ideal_voltage)
-scatter(pos, zeros(trap.num_ion), minorgrid=true)
+scatter(pos, zeros(num_ion), minorgrid=true)
 ylims!(-1,1)
 
 
