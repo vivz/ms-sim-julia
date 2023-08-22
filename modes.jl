@@ -1,5 +1,6 @@
 include("ion_spacing.jl")
 using LinearAlgebra
+using Plots
 
 function get_distance_matrix(positions::Vector{Float64})
     # returns 1/abs(x_i - x_j)
@@ -14,7 +15,8 @@ function get_distance_matrix(positions::Vector{Float64})
     return abs_distance
 end 
 
-function get_axial_hessian(trap::TrapVoltage)
+function get_axial_modes(trap::TrapVoltage)
+    # Return axial mode in Hz
     positions = get_ion_spacing_for_voltage(trap)
     # off-diagonal terms: 2/abs(x_i - x_j)^3
     hessian = get_distance_matrix(positions)
@@ -32,13 +34,26 @@ function get_axial_hessian(trap::TrapVoltage)
         hessian[i,i] = get_static_derivative(positions[i]) - coulomb_derivative[i]
     end 
     @show hessian
-    return hessian
+    ω2 = eigvals(hessian) # ω2 is mω^2 
+    if any(x->x<0, ω2)
+        print("Hessian matrix should not have negative eigenvalues")
+        return
+    end 
+    return sqrt.(ω2 / YB171_MASS) / 2π
 end 
 
-
-function get_axial_modes(trap::TrapVoltage)
-    # Return axial mode in Hz
-    hessian = get_axial_hessian(trap)
+function get_radial_modes(trap::TrapVoltage, radial_com::Float64)
+    # radial_com: frequency of radial com mode in Hz
+    # Return all radial mode in Hz
+    positions = get_ion_spacing_for_voltage(trap)
+    # off-diagonal terms: 1/abs(x_i - x_j)^3
+    hessian = get_distance_matrix(positions)
+    hessian = -1 * ELECTRON_CHARGE^2 / (4π * PERMITTIVITY) * (hessian .^3)
+    # diagonal terms: second derivative of radial confinement at y_0 + 2/abs(x_i - x_j)^3 summing over all j
+    coulomb_derivative = sum(hessian, dims=1)
+    for i in 1:trap.num_ion
+        hessian[i,i] = YB171_MASS * (radial_com * 2π)^2 - coulomb_derivative[i]
+    end 
     ω2 = eigvals(hessian) # ω2 is mω^2 
     if any(x->x<0, ω2)
         print("Hessian matrix should not have negative eigenvalues")
@@ -48,5 +63,11 @@ function get_axial_modes(trap::TrapVoltage)
 end
 
 
-voltage = find_voltage_for_spacing(4.7e-6, 2, true, 0)
-get_axial_modes(voltage)
+voltage = find_voltage_for_spacing(4.7e-6, 10, true, 0)
+modes = get_axial_modes(voltage)
+pos = get_ion_spacing_for_voltage(voltage)
+scatter(pos, zeros(num_ion), minorgrid=true)
+ylims!(-1,1)
+bar(modes,fill(1,voltage.num_ion, 1))
+histogram(modes, bins=100, label="mode frequency")
+xlabel!("Mode frequency (Hz)")
