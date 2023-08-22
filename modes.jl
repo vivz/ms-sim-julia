@@ -24,8 +24,8 @@ function get_axial_hessian(trap::TrapVoltage)
     function get_static_derivative(x0::Float64)
         # returns the second derivative of the static axial potential
         x0′ = x0 / EURIQA_x0
-        # something is not right here
-        return EURIQA_v0 / EURIQA_x0^2 * (trap.x2 + trap.x3 * x0′ + trap.x4 * x0′^2 / 2.0) 
+        # U = q * V
+        return ELECTRON_CHARGE * EURIQA_v0 / EURIQA_x0^2 * (trap.x2 + trap.x3 * x0′ + trap.x4 * x0′^2 / 2.0) 
     end 
     coulomb_derivative = sum(hessian, dims=1)
     for i in 1:trap.num_ion
@@ -37,6 +37,7 @@ end
 
 
 function get_axial_modes(trap::TrapVoltage)
+    # Return axial mode in Hz
     hessian = get_axial_hessian(trap)
     ω2 = eigvals(hessian) # ω2 is mω^2 
     if any(x->x<0, ω2)

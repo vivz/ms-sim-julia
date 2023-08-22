@@ -26,7 +26,7 @@ function get_voltage(trap::TrapVoltage, x::Float64)
 end
 
 function get_coulomb_potential_at_x(ion_positions::Vector{Float64}, ion_index::Int64)
-    # Calculate coulomb potential at one ion's position from other ions 
+    # Calculate coulomb potential (in voltage) at one ion's position from other ions 
     potential = 0.0
     x = ion_positions[ion_index]
     for i in eachindex(ion_positions)
@@ -105,7 +105,7 @@ function find_voltage_for_spacing(spacing::Float64, num_ion::Int64, quadratic::B
     return TrapVoltage(0.0, voltages[1], 0.0, quadratic ? 0.0 : voltages[2], num_ion)
 end 
 
-num_ions = 31
+num_ions = 2
 # trap = TrapVoltage(0, 0.4, 0, 0.0, num_ions)
 ideal_voltage = find_voltage_for_spacing(4.7e-6, num_ions, true, 0)
 print(ideal_voltage)
