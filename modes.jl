@@ -1,5 +1,4 @@
 include("ion_spacing.jl")
-using PlotlyJS
 using LinearAlgebra
 using Plots
 
@@ -54,17 +53,21 @@ function get_radial_modes(trap::TrapVoltage, radial_com::Float64)
     end 
     results = eigen(hessian) # ω2 is mω^2 
     if any(x->x<0, results.values)
-        print("Hessian matrix should not have negative eigenvalues")
+        throw(ErrorException("Hessian matrix should not have negative eigenvalues"))
         return
     end 
     return sqrt.(results.values / YB171_MASS) / 2π, results.vectors
 end
 
-num_ion = 10
+num_ion = 3
 voltage = find_voltage_for_spacing(4.7e-6, num_ion, true, 0)
-# modes, participation = get_axial_modes(voltage)
-modes, participation = get_radial_modes(voltage, 2.369e6)
-bar(modes,fill(1,voltage.num_ion, 1))
-histogram(modes, bins=200, label="mode frequency")
+modes, participation = get_axial_modes(voltage)
+# modes, participation = get_radial_modes(voltage, 2.369e6)
+Plots.bar(modes,fill(1,voltage.num_ion, 1))
+Plots.histogram(modes, bins=200, label="mode frequency")
 xlabel!("Mode frequency (Hz)")
-plot(heatmap(z=participation))
+Plots.heatmap(participation)
+nrow, ncol = size(participation)
+ann = [(i,j, text(round(participation[i,j], digits=2), fontsize, :white, :center))
+            for i in 1:nrow for j in 1:ncol]
+annotate!(ann, linecolor=:white)
