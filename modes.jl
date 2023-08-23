@@ -1,4 +1,5 @@
 include("ion_spacing.jl")
+using PlotlyJS
 using LinearAlgebra
 using Plots
 
@@ -11,17 +12,15 @@ function get_distance_matrix(positions::Vector{Float64})
     end 
     abs_distance = 1 ./ broadcast(abs, xii - xii')
     replace!(abs_distance, Inf=>0)
-    @show abs_distance
     return abs_distance
 end 
 
 function get_axial_modes(trap::TrapVoltage)
-    # Return axial mode in Hz
+    # Return axial mode in Hz and participation vectors
     positions = get_ion_spacing_for_voltage(trap)
     # off-diagonal terms: 2/abs(x_i - x_j)^3
     hessian = get_distance_matrix(positions)
     hessian = -2 * ELECTRON_CHARGE^2 / (4π * PERMITTIVITY) * (hessian .^3)
-    @show hessian
     # diagonal terms: second derivate of static potential + suming over 2/abs(x_i - x_j)^3 for all j
     function get_static_derivative(x0::Float64)
         # returns the second derivative of the static axial potential
@@ -33,41 +32,39 @@ function get_axial_modes(trap::TrapVoltage)
     for i in 1:trap.num_ion
         hessian[i,i] = get_static_derivative(positions[i]) - coulomb_derivative[i]
     end 
-    @show hessian
-    ω2 = eigvals(hessian) # ω2 is mω^2 
-    if any(x->x<0, ω2)
+    results = eigen(hessian) 
+    if any(x->x<0, results.values)
         print("Hessian matrix should not have negative eigenvalues")
         return
     end 
-    return sqrt.(ω2 / YB171_MASS) / 2π
+    return sqrt.(results.values/ YB171_MASS) / 2π, results.vectors
 end 
 
 function get_radial_modes(trap::TrapVoltage, radial_com::Float64)
-    # radial_com: frequency of radial com mode in Hz
-    # Return all radial mode in Hz
+    # Radial_com: frequency of radial com mode in Hz
+    # Return all radial mode in Hz, and participation vectors
     positions = get_ion_spacing_for_voltage(trap)
     # off-diagonal terms: 1/abs(x_i - x_j)^3
     hessian = get_distance_matrix(positions)
-    hessian = -1 * ELECTRON_CHARGE^2 / (4π * PERMITTIVITY) * (hessian .^3)
-    # diagonal terms: second derivative of radial confinement at y_0 + 2/abs(x_i - x_j)^3 summing over all j
+    hessian = 1 * ELECTRON_CHARGE^2 / (4π * PERMITTIVITY) * (hessian .^3)
+    # diagonal terms: second derivative of radial confinement at y_0 + 1/abs(x_i - x_j)^3 summing over all j
     coulomb_derivative = sum(hessian, dims=1)
     for i in 1:trap.num_ion
         hessian[i,i] = YB171_MASS * (radial_com * 2π)^2 - coulomb_derivative[i]
     end 
-    ω2 = eigvals(hessian) # ω2 is mω^2 
-    if any(x->x<0, ω2)
+    results = eigen(hessian) # ω2 is mω^2 
+    if any(x->x<0, results.values)
         print("Hessian matrix should not have negative eigenvalues")
         return
     end 
-    return sqrt.(ω2 / YB171_MASS) / 2π
+    return sqrt.(results.values / YB171_MASS) / 2π, results.vectors
 end
 
-
-voltage = find_voltage_for_spacing(4.7e-6, 10, true, 0)
-modes = get_axial_modes(voltage)
-pos = get_ion_spacing_for_voltage(voltage)
-scatter(pos, zeros(num_ion), minorgrid=true)
-ylims!(-1,1)
+num_ion = 10
+voltage = find_voltage_for_spacing(4.7e-6, num_ion, true, 0)
+# modes, participation = get_axial_modes(voltage)
+modes, participation = get_radial_modes(voltage, 2.369e6)
 bar(modes,fill(1,voltage.num_ion, 1))
-histogram(modes, bins=100, label="mode frequency")
+histogram(modes, bins=200, label="mode frequency")
 xlabel!("Mode frequency (Hz)")
+plot(heatmap(z=participation))

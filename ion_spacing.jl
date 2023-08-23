@@ -110,7 +110,7 @@ num_ions = 2
 ideal_voltage = find_voltage_for_spacing(4.7e-6, num_ions, true, 0)
 print(ideal_voltage)
 pos = get_ion_spacing_for_voltage(ideal_voltage)
-scatter(pos, zeros(num_ion), minorgrid=true)
+scatter(pos, zeros(num_ions), minorgrid=true)
 ylims!(-1,1)
 
 
